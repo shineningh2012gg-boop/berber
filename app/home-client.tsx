@@ -1,10 +1,15 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, CalendarDays, Check, ChevronDown, Clock3, Instagram, MapPin, Menu, Scissors, ShieldCheck, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type Lang = 'tr' | 'en';
 type Service = { id: string; tr: string; en: string; price: number; duration: number };
+const heroImages = [
+ 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=2000&q=85',
+ 'https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=2000&q=85',
+ 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=2000&q=85',
+];
 const services: Service[] = [
   { id: 'cut', tr: 'Saç kesimi', en: 'Haircut', price: 450, duration: 30 },
   { id: 'beard', tr: 'Sakal tasarımı', en: 'Beard trim', price: 250, duration: 20 },
@@ -16,6 +21,8 @@ const copy = {
  en: { navServices:'Services', navAbout:'About', navReviews:'Reviews', navBook:'Book now', eyebrow:'TIMELESS CRAFT · MODERN TOUCH', headline:'Make your\nstyle a signature.', intro:'A moment for yourself. Skilled hands, thoughtful details and an experience made for you.', explore:'Explore services', since:'BALIKESİR · BARBER & GROOMING', services:'Our services', servicesSub:'Choose what suits you. Transparent pricing, tailored results.', about:'The difference is in the details.', aboutSub:'At NOIR, a great cut is just the beginning. A relaxed atmosphere, personal advice and careful craftsmanship are part of every visit.', reviews:'A word from our guests', reviewsSub:'View authentic customer feedback on our Google profile.', book:'Book your appointment', bookSub:'Choose a service and an available time.', name:'Full name', phone:'Phone number', date:'Date', time:'Time', service:'Service', submit:'Request appointment', note:'Your booking is confirmed once approved by the barber.', contact:'Find us', hours:'Opening hours', weekdays:'Monday – Saturday', closed:'Sunday closed', address:'Balıkesir, Türkiye · Sample address', footer:'Look sharp. Feel good.', admin:'Business panel', demo:'Demo view', success:'Request received! Your appointment is pending business approval.', error:'Could not save the booking. Please try again or contact the shop.' }
 };
 export default function Home() {
+ const [heroIndex,setHeroIndex] = useState(0);
+ useEffect(()=>{ const timer=window.setInterval(()=>setHeroIndex(i=>(i+1)%3),5500); return ()=>window.clearInterval(timer); },[]);
  const [lang,setLang] = useState<Lang>('tr'); const [selected,setSelected] = useState('cut'); const [date,setDate] = useState(''); const [time,setTime] = useState('09:00'); const [bookedSlots,setBookedSlots] = useState<string[]>(['11:00','15:00']); const [name,setName] = useState(''); const [phone,setPhone] = useState(''); const [notice,setNotice] = useState(''); const [busy,setBusy] = useState(false); const [admin,setAdmin] = useState(false);
  const t = copy[lang]; const service = services.find(s=>s.id===selected)!;
  const slots = useMemo(()=>[{start:'09:00',end:'10:00'},{start:'10:00',end:'11:00'},{start:'11:00',end:'12:00'},{start:'13:00',end:'14:00'},{start:'14:00',end:'15:00'},{start:'15:00',end:'16:00'},{start:'16:00',end:'17:00'},{start:'17:00',end:'18:00'},{start:'18:00',end:'19:00'}],[]);
@@ -26,7 +33,7 @@ export default function Home() {
  }
  return <main>
   <header className="topbar"><a className="brand" href="#top"><span className="brand-mark">N</span><span>NOIR<span className="brand-light">BARBER</span></span></a><nav><a href="#services">{t.navServices}</a><a href="#about">{t.navAbout}</a><a href="#reviews">{t.navReviews}</a></nav><div className="top-actions"><button className="lang" onClick={()=>setLang(lang==='tr'?'en':'tr')}>{lang==='tr'?'EN':'TR'} <ChevronDown size={14}/></button><a className="button button-dark small" href="#booking">{t.navBook}<ArrowRight size={15}/></a><button className="menu"><Menu/></button></div></header>
-  <section className="hero" id="top"><div className="hero-image"/><div className="hero-shade"/><div className="hero-content"><div className="eyebrow"><span/> {t.eyebrow}</div><h1>{t.headline.split('\n').map((x,i)=><span key={i}>{x}<br/></span>)}</h1><p>{t.intro}</p><div className="hero-actions"><a className="button button-light" href="#booking">{t.navBook}<ArrowRight size={16}/></a><a className="text-link" href="#services">{t.explore}</a></div><div className="hero-bottom"><span>{t.since}</span><span>01 / 04</span></div></div><div className="vertical-note">CRAFTED FOR YOUR CONFIDENCE</div></section>
+  <section className="hero" id="top"><div key={heroIndex} className="hero-image hero-image-slide" style={{backgroundImage:`url(${heroImages[heroIndex]})`}}/><div className="hero-shade"/><div className="hero-content"><div className="eyebrow"><span/> {t.eyebrow}</div><h1>{t.headline.split('\n').map((x,i)=><span key={i}>{x}<br/></span>)}</h1><p>{t.intro}</p><div className="hero-actions"><a className="button button-light" href="#booking">{t.navBook}<ArrowRight size={16}/></a><a className="text-link" href="#services">{t.explore}</a></div><div className="hero-bottom"><span>{t.since}</span><span>0{heroIndex+1} / 03</span></div><div className="hero-dots" aria-label="Hero image selection">{heroImages.slice(0,3).map((_,i)=><button key={i} type="button" aria-label={`Show image ${i+1}`} aria-current={heroIndex===i} className={heroIndex===i?"active":""} onClick={()=>setHeroIndex(i)}/>)}</div></div><div className="vertical-note">CRAFTED FOR YOUR CONFIDENCE</div></section>
   <section className="trust-strip"><div><Scissors/><span>Usta işçilik</span></div><div><ShieldCheck/><span>Hijyenik ortam</span></div><div><Clock3/><span>Kolay randevu</span></div><div><Star/><span>Kişisel deneyim</span></div></section>
   <section className="section services-section" id="services"><div className="section-heading"><div><div className="eyebrow dark-eyebrow">01 / THE EXPERIENCE</div><h2>{t.services}</h2><p>{t.servicesSub}</p></div><span className="section-number">01</span></div><div className="service-grid">{services.map((s,i)=><article className="service-card" key={s.id}><div className="service-top"><span>0{i+1}</span><Scissors size={19}/></div><h3>{lang==='tr'?s.tr:s.en}</h3><div className="service-meta"><span>{s.duration} {lang==='tr'?'dk':'min'}</span><strong>{s.price} ₺</strong></div><button onClick={()=>{setSelected(s.id);document.querySelector('#booking')?.scrollIntoView({behavior:'smooth'});}}>{lang==='tr'?'Bu hizmeti seç':'Choose service'} <ArrowRight size={15}/></button></article>)}</div></section>
   <section className="about-section" id="about"><div className="about-photo"/><div className="about-copy"><div className="eyebrow dark-eyebrow">02 / OUR PHILOSOPHY</div><h2>{t.about}</h2><p>{t.aboutSub}</p><div className="signature">NOIR <span>BARBER</span></div></div></section>
