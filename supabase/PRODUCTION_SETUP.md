@@ -51,11 +51,15 @@ The first admin version supports:
 
 Only authenticated users listed in `business_members` can manage business content. Public users can read published content.
 
-## 5. Before accepting real bookings
+## 5. Enable public appointment requests
 
-The public booking form is not production-ready yet. It must be moved behind a server-side endpoint that validates the business, service, opening hours, availability and request rate, and prevents overlapping appointments transactionally. Do not create an anonymous INSERT policy for appointments.
+After `schema.sql` has been run, open Supabase SQL Editor and run `supabase/booking.sql`. This creates two restricted RPC functions: one returns available time slots, and the other creates a pending appointment after validating the business, active service, opening hours and overlaps. Booking attempts for this business are serialized by locking its business row. The website calls these functions through `/api/appointments`; no service-role key is required.
 
-The public homepage still needs to be connected to the editable database content, and the gallery needs a managed image-upload flow. Do not advertise those features as live until that integration is completed and tested.
+The schedule currently allows Monday–Saturday, 09:00–19:00, with the time options shown on the booking form. Sunday is closed. Pending and confirmed appointments both reserve their time. The admin can confirm or cancel pending requests.
+
+Do not create an anonymous INSERT policy on `appointments`. Test a request, confirm it appears in `/admin`, then test that the same time is no longer offered. Add proper edge/WAF rate limiting before a high-traffic public launch; the booking endpoint currently uses input validation and a hidden honeypot but does not provide distributed rate limiting.
+
+The public homepage now reads published business details, active services and published reviews from Supabase. Gallery images still need to be connected to the homepage and the admin currently accepts image URLs rather than uploads.
 
 ## 6. Google reviews
 
