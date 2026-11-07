@@ -27,3 +27,13 @@
 :root{--ink:#000;--muted:#222}
 body{color:#000}
 .topbar nav,.brand-light,.trust-strip div,.section-heading p,.about-copy p,.service-top,.service-meta,.admin-box p{color:#111}
+
+
+/* Hero image carousel with a soft cross-fade */
+.hero-image-slide{animation:heroFadeIn 1.25s ease both}
+@keyframes heroFadeIn{from{opacity:.2;transform:scale(1.025)}to{opacity:1;transform:scale(1)}}
+.hero-dots{position:absolute;left:12%;bottom:28px;display:flex;gap:8px;z-index:2}
+.hero-dots button{width:22px;height:3px;border:0;padding:0;background:rgba(255,255,255,.45);cursor:pointer;transition:width .25s,background .25s}
+.hero-dots button.active{width:38px;background:#c5a879}
+@media(max-width:800px){.hero-dots{left:8%;bottom:25px}}
+@media(prefers-reduced-motion:reduce){.hero-image-slide{animation:none}.hero-dots button{transition:none}}
