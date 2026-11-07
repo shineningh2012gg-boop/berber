@@ -81,3 +81,5 @@ body{color:#000}
 .admin-notice{padding:13px 15px;background:#fff;border-left:3px solid #b99a65;margin:0 0 18px;font-size:12px;line-height:1.6}
 @media(max-width:850px){.admin-layout{grid-template-columns:1fr}.admin-sidebar{border-right:0;border-bottom:1px solid #e8e5df;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:15px}.admin-kicker{grid-column:1/-1;margin:4px 8px}.admin-content{padding:30px 18px}.admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.admin-header{padding:0 16px}.admin-header>div{gap:8px;font-size:10px}.admin-header .brand{font-size:13px}.admin-content{padding:25px 14px}.admin-title h1{font-size:34px}.admin-card{grid-template-columns:1fr;padding:15px}.admin-fields .wide{grid-column:auto}.admin-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-list article{align-items:flex-start;flex-wrap:wrap}.admin-list article>div{flex-basis:100%}.admin-login{padding:25px}}
+
+.admin-publish{display:flex!important;flex-direction:row!important;align-items:center;gap:10px}.admin-publish input{width:16px;height:16px;accent-color:#b99a65}
