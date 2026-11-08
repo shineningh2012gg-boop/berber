@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
   if (adminEmail) {
     const when = new Date(body.startsAt).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
-    void sendEmail(adminEmail, 'NOIR BARBER · Yeni randevu talebi', `<h2>Yeni randevu talebi</h2><p><b>Müşteri:</b> ${escapeHtml(body.name)}</p><p><b>Telefon:</b> ${escapeHtml(body.phone)}</p><p><b>E-posta:</b> ${escapeHtml(body.email)}</p><p><b>Tarih:</b> ${escapeHtml(when)}</p><p>Randevuyu yönetim panelinden onaylayabilirsin.</p>`);
+    await sendEmail(adminEmail, 'NOIR BARBER · Yeni randevu talebi', `<h2>Yeni randevu talebi</h2><p><b>Müşteri:</b> ${escapeHtml(body.name)}</p><p><b>Telefon:</b> ${escapeHtml(body.phone)}</p><p><b>E-posta:</b> ${escapeHtml(body.email)}</p><p><b>Tarih:</b> ${escapeHtml(when)}</p><p>Randevuyu yönetim panelinden onaylayabilirsin.</p>`);
   }
   return NextResponse.json({ ok: true, appointment: data }, { status: 201 });
 }
