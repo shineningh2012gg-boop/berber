@@ -57,7 +57,7 @@ begin
   v_local_time := v_local_start::time;
 
   if p_starts_at <= now()
-     or v_local_date > (now() at time zone v_timezone)::date + 60
+     or v_local_date > (now() at time zone v_timezone)::date + 10
      or extract(isodow from v_local_date) not between 1 and 6
      or v_local_time not in (time '09:00', time '10:00', time '11:00', time '13:00', time '14:00', time '15:00', time '16:00', time '17:00', time '18:00')
      or v_local_time + make_interval(mins => v_duration) > time '19:00' then
