@@ -5,7 +5,7 @@ create table if not exists public.business_notification_settings (
   notification_email text not null,
   updated_at timestamptz not null default now(),
   constraint business_notification_email_format check (
-    notification_email ~* '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
+    notification_email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
   )
 );
 
