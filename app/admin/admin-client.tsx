@@ -8,7 +8,7 @@ type Business = { id: string; name: string; slug: string; phone: string | null; 
 type Service = { id: string; name: string; price: number; duration_minutes: number; is_active: boolean };
 type Review = { id: string; customer_name: string; review_text: string; rating: number; source: string; is_published: boolean };
 type Gallery = { id: string; image_url: string; alt_text: string; is_published: boolean };
-type Appointment = { id: string; customer_name: string; customer_phone: string; service_name: string; starts_at: string; status: string };
+type Appointment = { id: string; customer_name: string; customer_phone: string; customer_email: string | null; service_name: string; starts_at: string; status: string };
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Genel bakış' }, { id: 'profile', label: 'İşletme bilgileri' },
@@ -130,8 +130,16 @@ export default function AdminPage() {
   }
   async function setAppointmentStatus(item: Appointment, status: string) {
     if (!supabase) return;
-    const { error } = await supabase.from('appointments').update({ status }).eq('id', item.id);
-    setNotice(error ? error.message : 'Randevu durumu güncellendi.'); if (!error) await loadBusiness();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) { setNotice('Oturum süresi dolmuş. Yeniden giriş yap.'); return; }
+    const response = await fetch(`/api/admin/appointments/${item.id}/status`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status }),
+    });
+    const result = await response.json();
+    setNotice(!response.ok ? (result.error || 'Randevu güncellenemedi.') : result.emailSent ? 'Randevu güncellendi ve müşteriye e-posta gönderildi.' : 'Randevu güncellendi. E-posta gönderilemedi; e-posta servis ayarlarını kontrol et.');
+    if (response.ok) await loadBusiness();
   }
 
   if (!sessionReady) return <main className="admin-page"><p>Yönetim paneli yükleniyor…</p></main>;
@@ -144,6 +152,6 @@ export default function AdminPage() {
 {tab==='services' && <><form className="admin-card admin-fields" onSubmit={addService}><label>Hizmet adı<input required value={serviceName} onChange={e=>setServiceName(e.target.value)}/></label><label>Fiyat (₺)<input required type="number" min="0" value={servicePrice} onChange={e=>setServicePrice(e.target.value)}/></label><label>Süre (dakika)<input required type="number" min="5" max="480" value={serviceDuration} onChange={e=>setServiceDuration(e.target.value)}/></label><button className="button button-dark">Hizmet ekle</button></form><div className="admin-list">{services.map(item=><article key={item.id}><div><strong>{item.name}</strong><span>{item.price} ₺ · {item.duration_minutes} dk · {item.is_active?'Aktif':'Gizli'}</span></div><button onClick={()=>toggleService(item)}>{item.is_active?'Gizle':'Yayınla'}</button><button className="danger" onClick={()=>deleteService(item.id)}>Sil</button></article>)}</div></>}
 {tab==='reviews' && <><form className="admin-card admin-fields" onSubmit={addReview}><label>Müşteri adı<input required value={reviewName} onChange={e=>setReviewName(e.target.value)}/></label><label>Puan<select value={reviewRating} onChange={e=>setReviewRating(e.target.value)}>{[5,4,3,2,1].map(n=><option key={n} value={n}>{n} / 5</option>)}</select></label><label className="wide">Yorum<textarea required rows={3} value={reviewText} onChange={e=>setReviewText(e.target.value)}/></label><button className="button button-dark">Manuel yorum ekle</button><small className="wide">Yalnızca gerçek müşterilerden alınan ve paylaşım izni bulunan yorumları ekle. Manuel yorumlar Google yorumu olarak etiketlenmez.</small></form><div className="admin-list">{reviews.map(item=><article key={item.id}><div><strong>{item.customer_name} · {'★'.repeat(item.rating)}</strong><span>{item.review_text}</span><small>{item.source==='google'?'Google kaynağı':'Manuel ekleme'}</small></div><button onClick={()=>toggleReview(item)}>{item.is_published?'Gizle':'Yayınla'}</button><button className="danger" onClick={()=>deleteReview(item.id)}>Sil</button></article>)}</div></>}
 {tab==='gallery' && <><form className="admin-card admin-fields" onSubmit={addImage}><label className="wide">Fotoğraf URL<input type="url" required placeholder="https://…" value={imageUrl} onChange={e=>setImageUrl(e.target.value)}/></label><label className="wide">Fotoğraf açıklaması<input value={imageAlt} onChange={e=>setImageAlt(e.target.value)}/></label><button className="button button-dark">Fotoğraf ekle</button><small className="wide">Bu ilk sürümde görseller URL ile eklenir. Dosya yükleme alanı Supabase Storage kurulunca etkinleştirilecek.</small></form><div className="admin-gallery">{gallery.map(item=><article key={item.id}><img src={item.image_url} alt={item.alt_text}/><div><span>{item.alt_text || 'Galeri görseli'}</span><button className="danger" onClick={()=>deleteImage(item.id)}>Kaldır</button></div></article>)}</div></>}
-{tab==='appointments' && <div className="admin-list">{appointments.length===0 && <p>Henüz randevu kaydı yok.</p>}{appointments.map(item=><article key={item.id}><div><strong>{item.customer_name} · {item.service_name}</strong><span>{item.customer_phone} · {new Date(item.starts_at).toLocaleString('tr-TR')}</span><small>Durum: {item.status}</small></div><button onClick={()=>setAppointmentStatus(item,'confirmed')}>Onayla</button><button className="danger" onClick={()=>setAppointmentStatus(item,'cancelled')}>İptal et</button></article>)}</div>}
+{tab==='appointments' && <div className="admin-list">{appointments.length===0 && <p>Henüz randevu kaydı yok.</p>}{appointments.map(item=><article key={item.id}><div><strong>{item.customer_name} · {item.service_name}</strong><span>{item.customer_phone} · {item.customer_email || 'E-posta yok'} · {new Date(item.starts_at).toLocaleString('tr-TR')}</span><small>Durum: {item.status}</small></div><button onClick={()=>setAppointmentStatus(item,'confirmed')}>Onayla</button><button className="danger" onClick={()=>setAppointmentStatus(item,'cancelled')}>İptal et</button></article>)}</div>}
 </section></div></main>;
 }
