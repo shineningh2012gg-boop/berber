@@ -3,23 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
-}
-
-async function sendEmail(to: string, subject: string, html: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.NOTIFICATION_FROM_EMAIL;
-  if (!apiKey || !from || !to) return false;
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: [to], subject, html }),
-  });
-  if (!response.ok) console.error('Customer status email failed:', await response.text());
-  return response.ok;
-}
-
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -43,7 +26,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   const { data: appointment, error: appointmentError } = await supabase
     .from('appointments')
-    .select('id,business_id,customer_name,customer_email,service_name,starts_at')
+    .select('id,business_id')
     .eq('id', id).single();
   if (appointmentError || !appointment) return NextResponse.json({ error: 'Randevu bulunamadı veya erişim izni yok.' }, { status: 404 });
 
@@ -55,10 +38,5 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const { error: updateError } = await supabase.from('appointments').update({ status: body.status }).eq('id', id);
   if (updateError) return NextResponse.json({ error: 'Randevu durumu güncellenemedi.' }, { status: 500 });
 
-  const when = new Date(appointment.starts_at).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
-  const confirmed = body.status === 'confirmed';
-  const subject = confirmed ? 'NOIR BARBER · Randevun onaylandı' : 'NOIR BARBER · Randevu güncellendi';
-  const html = `<h2>${confirmed ? 'Randevun onaylandı' : 'Randevun iptal edildi'}</h2><p>Merhaba ${escapeHtml(appointment.customer_name)},</p><p><b>Hizmet:</b> ${escapeHtml(appointment.service_name)}</p><p><b>Tarih:</b> ${escapeHtml(when)}</p><p>${confirmed ? 'Seni bekliyoruz.' : 'Yeni bir randevu oluşturmak için web sitemizi ziyaret edebilirsin.'}</p>`;
-  const emailSent = appointment.customer_email ? await sendEmail(appointment.customer_email, subject, html) : false;
-  return NextResponse.json({ ok: true, emailSent });
+  return NextResponse.json({ ok: true });
 }
