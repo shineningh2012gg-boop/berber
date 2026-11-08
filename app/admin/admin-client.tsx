@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { requestBrowserPushSubscription } from '@/lib/push-client';
 
 type Tab = 'overview' | 'profile' | 'services' | 'reviews' | 'gallery' | 'appointments';
 type Business = { id: string; name: string; slug: string; phone: string | null; address: string | null; instagram_url: string | null; google_maps_url: string | null; description: string | null; opening_hours: Record<string,string> | null; is_published: boolean };
@@ -76,6 +77,26 @@ export default function AdminPage() {
     setBusy(false); if (error) setNotice('Giriş yapılamadı: ' + error.message);
     else { setPassword(''); await loadBusiness(); }
   }
+  async function enableOwnerNotifications() {
+    if (!supabase) return;
+    try {
+      const subscription = await requestBrowserPushSubscription();
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('Oturum süresi dolmuş. Yeniden giriş yap.');
+      const response = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ role: 'owner', subscription }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Bildirim aboneliği kaydedilemedi.');
+      setNotice('Yeni randevu bildirimleri bu cihazda etkin.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Bildirimler açılamadı.');
+    }
+  }
+
   async function signOut() { if (supabase) await supabase.auth.signOut(); setBusiness(null); }
 
   async function saveProfile(e: React.FormEvent) {
@@ -146,7 +167,7 @@ export default function AdminPage() {
   if (!supabase) return <main className="admin-page"><section className="admin-login"><h1>NOIR / Yönetim</h1><p>Supabase bağlantısı bulunamadı. Ortam değişkenlerini ayarlamadan yönetim paneli kullanılamaz.</p><code>NEXT_PUBLIC_SUPABASE_URL</code><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></section></main>;
   if (!business) return <main className="admin-page"><form className="admin-login" onSubmit={signIn}><a className="admin-back" href="/">← Siteye dön</a><div className="eyebrow dark-eyebrow">NOIR / SECURE ACCESS</div><h1>Yönetici girişi</h1><p>İşletme hesabınla giriş yap.</p><label>E-posta<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} /></label><label>Şifre<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} /></label><button className="button button-dark" disabled={busy}>{busy ? 'Giriş yapılıyor…' : 'Giriş yap'}</button>{notice && <p className="admin-notice">{notice}</p>}<small>Hesap oluşturma herkese açık değildir. İşletme sahibi hesabı Supabase üzerinden yetkilendirilmelidir.</small></form></main>;
 
-  return <main className="admin-page"><header className="admin-header"><a className="brand" href="/"><span className="brand-mark">N</span><span>NOIR<span className="brand-light">BARBER</span></span></a><div><span>{business.name}</span><button onClick={signOut}>Çıkış yap</button></div></header><div className="admin-layout"><aside className="admin-sidebar"><div className="admin-kicker">İŞLETME YÖNETİMİ</div>{tabs.map(item=><button key={item.id} className={tab===item.id?'selected':''} onClick={()=>setTab(item.id)}>{item.label}</button>)}</aside><section className="admin-content"><div className="admin-title"><div className="eyebrow dark-eyebrow">NOIR / CONTROL CENTER</div><h1>{tabs.find(x=>x.id===tab)?.label}</h1><p>İçerik ve işletme ayarlarını buradan yönet.</p></div>{notice && <div className="admin-notice">{notice}</div>}
+  return <main className="admin-page"><header className="admin-header"><a className="brand" href="/"><span className="brand-mark">N</span><span>NOIR<span className="brand-light">BARBER</span></span></a><div><span>{business.name}</span><button onClick={enableOwnerNotifications}>Bildirimleri aç</button><button onClick={signOut}>Çıkış yap</button></div></header><div className="admin-layout"><aside className="admin-sidebar"><div className="admin-kicker">İŞLETME YÖNETİMİ</div>{tabs.map(item=><button key={item.id} className={tab===item.id?'selected':''} onClick={()=>setTab(item.id)}>{item.label}</button>)}</aside><section className="admin-content"><div className="admin-title"><div className="eyebrow dark-eyebrow">NOIR / CONTROL CENTER</div><h1>{tabs.find(x=>x.id===tab)?.label}</h1><p>İçerik ve işletme ayarlarını buradan yönet.</p></div>{notice && <div className="admin-notice">{notice}</div>}
 {tab==='overview' && <div className="admin-stats"><article><strong>{appointments.filter(x=>x.status==='pending').length}</strong><span>Bekleyen randevu</span></article><article><strong>{services.filter(x=>x.is_active).length}</strong><span>Aktif hizmet</span></article><article><strong>{reviews.filter(x=>x.is_published).length}</strong><span>Yayındaki yorum</span></article><article><strong>{gallery.length}</strong><span>Galeri fotoğrafı</span></article></div>}
 {tab==='profile' && <form className="admin-card admin-fields" onSubmit={saveProfile}><label>İşletme adı<input required value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/></label><label>Telefon<input value={profile.phone} onChange={e=>setProfile({...profile,phone:e.target.value})}/></label><label>Adres<input value={profile.address} onChange={e=>setProfile({...profile,address:e.target.value})}/></label><label>Instagram bağlantısı<input value={profile.instagram_url} onChange={e=>setProfile({...profile,instagram_url:e.target.value})}/></label><label>Google Maps bağlantısı<input value={profile.google_maps_url} onChange={e=>setProfile({...profile,google_maps_url:e.target.value})}/></label><label className="wide">Hakkımızda metni<textarea rows={4} value={profile.description} onChange={e=>setProfile({...profile,description:e.target.value})}/></label><label className="wide admin-publish"><input type="checkbox" checked={profile.is_published} onChange={e=>setProfile({...profile,is_published:e.target.checked})}/> Siteyi herkese açık yayınla</label><button className="button button-dark" disabled={busy}>Bilgileri kaydet</button></form>}
 {tab==='services' && <><form className="admin-card admin-fields" onSubmit={addService}><label>Hizmet adı<input required value={serviceName} onChange={e=>setServiceName(e.target.value)}/></label><label>Fiyat (₺)<input required type="number" min="0" value={servicePrice} onChange={e=>setServicePrice(e.target.value)}/></label><label>Süre (dakika)<input required type="number" min="5" max="480" value={serviceDuration} onChange={e=>setServiceDuration(e.target.value)}/></label><button className="button button-dark">Hizmet ekle</button></form><div className="admin-list">{services.map(item=><article key={item.id}><div><strong>{item.name}</strong><span>{item.price} ₺ · {item.duration_minutes} dk · {item.is_active?'Aktif':'Gizli'}</span></div><button onClick={()=>toggleService(item)}>{item.is_active?'Gizle':'Yayınla'}</button><button className="danger" onClick={()=>deleteService(item.id)}>Sil</button></article>)}</div></>}
