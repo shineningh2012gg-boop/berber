@@ -10,19 +10,6 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.NOTIFICATION_FROM_EMAIL;
-  if (!apiKey || !from || !to) return false;
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: [to], subject, html }),
-  });
-  if (!response.ok) console.error('Email notification failed:', await response.text());
-  return response.ok;
-}
-
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) return NextResponse.json({ error: 'Randevu sistemi şu anda kullanılamıyor.' }, { status: 503 });
@@ -39,20 +26,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) return NextResponse.json({ error: 'Randevu sistemi şu anda kullanılamıyor.' }, { status: 503 });
-  let body: { name?: string; phone?: string; email?: string; serviceId?: string; startsAt?: string; website?: string };
+  let body: { name?: string; phone?: string; serviceId?: string; startsAt?: string; website?: string };
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: 'Gönderilen bilgiler okunamadı.' }, { status: 400 }); }
   if (body.website) return NextResponse.json({ ok: true });
-  if (typeof body.name !== 'string' || typeof body.phone !== 'string' || typeof body.email !== 'string'
+  if (typeof body.name !== 'string' || typeof body.phone !== 'string'
       || typeof body.serviceId !== 'string' || typeof body.startsAt !== 'string'
       || !/^[0-9a-f-]{36}$/i.test(body.serviceId) || !Number.isFinite(Date.parse(body.startsAt))
       || body.name.trim().length < 2 || body.name.trim().length > 80
-      || body.phone.trim().length < 10 || body.phone.trim().length > 24
-      || body.email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim())) {
-    return NextResponse.json({ error: 'Lütfen ad, telefon ve geçerli e-posta bilgilerini kontrol et.' }, { status: 400 });
+      || body.phone.trim().length < 10 || body.phone.trim().length > 24) {
+    return NextResponse.json({ error: 'Lütfen ad, telefon ve randevu bilgilerini kontrol et.' }, { status: 400 });
   }
   const { data, error } = await supabase.rpc('create_public_appointment', {
-    p_customer_name: body.name, p_customer_phone: body.phone, p_customer_email: body.email.trim(),
+    p_customer_name: body.name, p_customer_phone: body.phone,
     p_service_id: body.serviceId, p_starts_at: body.startsAt,
   });
   if (error) {
@@ -61,23 +47,5 @@ export async function POST(request: NextRequest) {
       ? message : 'Randevu kaydedilemedi. Lütfen tekrar dene.';
     return NextResponse.json({ error: safeMessage }, { status: 409 });
   }
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  let adminEmail = '';
-  if (serviceRoleKey) {
-    const privateClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: business } = await privateClient.from('businesses').select('id').eq('slug', 'noir-barber').eq('is_published', true).maybeSingle();
-    if (business) {
-      const { data: settings } = await privateClient.from('business_notification_settings').select('notification_email').eq('business_id', business.id).maybeSingle();
-      adminEmail = settings?.notification_email || '';
-    }
-  }
-  if (adminEmail) {
-    const when = new Date(body.startsAt).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
-    await sendEmail(adminEmail, 'NOIR BARBER · Yeni randevu talebi', `<h2>Yeni randevu talebi</h2><p><b>Müşteri:</b> ${escapeHtml(body.name)}</p><p><b>Telefon:</b> ${escapeHtml(body.phone)}</p><p><b>E-posta:</b> ${escapeHtml(body.email)}</p><p><b>Tarih:</b> ${escapeHtml(when)}</p><p>Randevuyu yönetim panelinden onaylayabilirsin.</p>`);
-  }
   return NextResponse.json({ ok: true, appointment: data }, { status: 201 });
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
 }
