@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { notifyBusinessOwnersForAppointment } from '@/lib/push';
 
 export const runtime = 'nodejs';
 
@@ -46,6 +47,14 @@ export async function POST(request: NextRequest) {
     const safeMessage = message.includes('Bu saat') || message.includes('Seçilen') || message.includes('Lütfen') || message.includes('İşletme')
       ? message : 'Randevu kaydedilemedi. Lütfen tekrar dene.';
     return NextResponse.json({ error: safeMessage }, { status: 409 });
+  }
+  const appointment = (Array.isArray(data) ? data[0] : data) as { id?: string } | null;
+  if (appointment?.id) {
+    try {
+      await notifyBusinessOwnersForAppointment(appointment.id);
+    } catch (notificationError) {
+      console.error('Could not notify business owner:', notificationError);
+    }
   }
   return NextResponse.json({ ok: true, appointment: data }, { status: 201 });
 }
