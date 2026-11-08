@@ -61,7 +61,16 @@ export async function POST(request: NextRequest) {
       ? message : 'Randevu kaydedilemedi. Lütfen tekrar dene.';
     return NextResponse.json({ error: safeMessage }, { status: 409 });
   }
-  const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  let adminEmail = '';
+  if (serviceRoleKey) {
+    const privateClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: business } = await privateClient.from('businesses').select('id').eq('slug', 'noir-barber').eq('is_published', true).maybeSingle();
+    if (business) {
+      const { data: settings } = await privateClient.from('business_notification_settings').select('notification_email').eq('business_id', business.id).maybeSingle();
+      adminEmail = settings?.notification_email || '';
+    }
+  }
   if (adminEmail) {
     const when = new Date(body.startsAt).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
     await sendEmail(adminEmail, 'NOIR BARBER · Yeni randevu talebi', `<h2>Yeni randevu talebi</h2><p><b>Müşteri:</b> ${escapeHtml(body.name)}</p><p><b>Telefon:</b> ${escapeHtml(body.phone)}</p><p><b>E-posta:</b> ${escapeHtml(body.email)}</p><p><b>Tarih:</b> ${escapeHtml(when)}</p><p>Randevuyu yönetim panelinden onaylayabilirsin.</p>`);
