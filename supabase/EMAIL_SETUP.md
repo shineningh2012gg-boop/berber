@@ -1,25 +1,25 @@
 # NOIR BARBER email notifications
 
-## 1. Supabase database migration
-
-Run `supabase/email_notifications.sql` once in the Supabase SQL Editor. It adds the customer email column, updates the public booking RPC, and restricts booking dates to the next 10 days.
+## 1. Database migration
+Run `supabase/email_notifications.sql` and then `supabase/business_notification_settings.sql` once each in the Supabase SQL Editor.
 
 ## 2. Resend setup
-
-Create a Resend account and verify a sender domain you control. Then add these environment variables to StackBlitz and to the production hosting environment:
+Create a Resend account and verify a sender domain you control. Then add these environment variables to StackBlitz and the production host:
 
 ```env
 RESEND_API_KEY=re_...
-NOTIFICATION_FROM_EMAIL=NOIR BARBER <randevu@your-verified-domain.com>
-ADMIN_NOTIFICATION_EMAIL=the-business-owner@example.com
+NOTIFICATION_FROM_EMAIL="NOIR BARBER <randevu@your-verified-domain.com>"
+SUPABASE_SERVICE_ROLE_KEY=your_server_only_service_role_key
 ```
 
-Use a sender address on the domain verified in Resend. Do not commit these values to GitHub or paste the API key into chat.
+Never put the service-role key in a `NEXT_PUBLIC_*` variable, commit it to GitHub, or paste it into chat. The service-role key is used only by the server to read the private notification address.
 
-## 3. What sends email
+## 3. Set the business notification address
+Sign in to `/admin`, open **E-posta Ayarları**, enter the business owner's notification email, and save it. The address is stored in a private table accessible only to signed-in business members and the server.
 
-- A new appointment request sends an email to `ADMIN_NOTIFICATION_EMAIL`.
-- When a manager confirms or cancels an appointment in the admin panel, the customer receives an email at the address entered in the booking form.
-- If the Resend variables are not configured, bookings and status changes still work, but email delivery will not happen.
-
-Restart the development server after changing environment variables. Configure the same variables in the production host before publishing.
+## 4. What sends email
+- New appointment requests send an email to the saved business notification address.
+- When the manager confirms or cancels an appointment in the admin panel, the customer receives an email at the address entered in the booking form.
+- If Resend or the server-only service-role environment variable is not configured, booking still works but the business notification email cannot be sent.
+- Restart the dev server after changing environment variables.
+- Configure the same server-only variables in the production host before publishing.
