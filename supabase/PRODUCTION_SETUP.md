@@ -61,6 +61,12 @@ Do not create an anonymous INSERT policy on `appointments`. Test a request, conf
 
 The public homepage now reads published business details, active services and published reviews from Supabase. Gallery images still need to be connected to the homepage and the admin currently accepts image URLs rather than uploads.
 
-## 6. Google reviews
+## 6. Remove the old email feature
+
+If the earlier email-notification SQL was already run on this project, open Supabase SQL Editor and run `supabase/remove_email_features.sql`, then run `supabase/booking.sql` again. This removes the customer email column and private email-settings table and restores the booking function without email.
+
+New installations should not run any email-related SQL files.
+
+## 7. Google reviews
 
 Manual reviews are stored separately and must be genuine reviews with permission to publish. Google-sourced reviews require a compliant Google Places API integration and should be labelled as Google-sourced. Do not copy a Google review into the manual source or imply a manually entered review came from Google.
