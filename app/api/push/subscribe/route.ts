@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
 
 export const runtime = 'nodejs';
 
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { role, subscription, appointmentId } = body || {};
+    const { role, subscription, appointmentId, notificationToken } = body || {};
 
     if (
       !subscription?.endpoint ||
@@ -57,14 +58,19 @@ export async function POST(request: NextRequest) {
       }
       businessId = membership.business_id;
     } else {
-      if (typeof appointmentId !== 'string' || !/^[0-9a-f-]{36}$/i.test(appointmentId)) {
-        return NextResponse.json({ error: 'Randevu bilgisi geçersiz.' }, { status: 400 });
+      if (
+        typeof appointmentId !== 'string' || !/^[0-9a-f-]{36}$/i.test(appointmentId) ||
+        typeof notificationToken !== 'string' || !/^[0-9a-f]{64}$/.test(notificationToken)
+      ) {
+        return NextResponse.json({ error: 'Randevu doğrulama bilgisi geçersiz.' }, { status: 400 });
       }
 
+      const notificationTokenHash = createHash('sha256').update(notificationToken).digest('hex');
       const { data: appointment, error: appointmentError } = await admin
         .from('appointments')
         .select('business_id')
         .eq('id', appointmentId)
+        .eq('notification_token_hash', notificationTokenHash)
         .maybeSingle();
 
       if (appointmentError || !appointment) {
