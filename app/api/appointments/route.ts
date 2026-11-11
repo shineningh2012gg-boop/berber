@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { randomBytes, createHash } from 'node:crypto';
 import { notifyBusinessOwnersForAppointment } from '@/lib/push';
 
 export const runtime = 'nodejs';
@@ -38,9 +39,15 @@ export async function POST(request: NextRequest) {
       || body.phone.trim().length < 10 || body.phone.trim().length > 24) {
     return NextResponse.json({ error: 'Lütfen ad, telefon ve randevu bilgilerini kontrol et.' }, { status: 400 });
   }
+  const notificationToken = randomBytes(32).toString('hex');
+  const notificationTokenHash = createHash('sha256').update(notificationToken).digest('hex');
+
   const { data, error } = await supabase.rpc('create_public_appointment', {
-    p_customer_name: body.name, p_customer_phone: body.phone,
-    p_service_id: body.serviceId, p_starts_at: body.startsAt,
+    p_customer_name: body.name,
+    p_customer_phone: body.phone,
+    p_service_id: body.serviceId,
+    p_starts_at: body.startsAt,
+    p_notification_token_hash: notificationTokenHash,
   });
   if (error) {
     const message = error.message || '';
@@ -56,5 +63,8 @@ export async function POST(request: NextRequest) {
       console.error('Could not notify business owner:', notificationError);
     }
   }
-  return NextResponse.json({ ok: true, appointment: data }, { status: 201 });
+  return NextResponse.json(
+    { ok: true, appointment: data, notificationToken },
+    { status: 201 }
+  );
 }
