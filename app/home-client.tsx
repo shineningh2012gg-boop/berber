@@ -50,7 +50,7 @@ export default function Home() {
        const pushResponse = await fetch('/api/push/subscribe', {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ role: 'customer', appointmentId: appointment.id, subscription: customerPushSubscription }),
+         body: JSON.stringify({ role: 'customer', appointmentId: appointment.id, notificationToken: result.notificationToken, subscription: customerPushSubscription }),
        });
        if (!pushResponse.ok) setPushNotice('Randevu alındı ancak bildirim kaydı yapılamadı.');
        else setPushNotice('Bildirimler bu randevu için etkinleştirildi.');
