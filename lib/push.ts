@@ -116,3 +116,26 @@ export async function notifyAppointmentCustomer(
     '/track'
   );
 }
+
+export async function notifyBusinessOwnersForAppointmentCancellation(appointmentId: string) {
+  const admin = getAdmin();
+  const { data: appointment, error: appointmentError } = await admin
+    .from('appointments')
+    .select('business_id')
+    .eq('id', appointmentId)
+    .maybeSingle();
+  if (appointmentError || !appointment) throw appointmentError || new Error('Appointment not found.');
+
+  const [{ data: business }, { data: subscriptions, error }] = await Promise.all([
+    admin.from('businesses').select('slug').eq('id', appointment.business_id).maybeSingle(),
+    admin.from('push_subscriptions').select('id, endpoint, p256dh, auth')
+      .eq('business_id', appointment.business_id).eq('role', 'owner'),
+  ]);
+  if (error) throw error;
+  await sendToSubscriptions(
+    (subscriptions || []) as PushSubscriptionRow[],
+    'Randevu iptal edildi',
+    'Bir müşteri randevusunu iptal etti.',
+    business?.slug ? `/admin/${business.slug}` : '/admin'
+  );
+}
