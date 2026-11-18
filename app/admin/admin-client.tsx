@@ -17,7 +17,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'gallery', label: 'Fotoğraf galerisi' }, { id: 'appointments', label: 'Randevular' },
 ];
 
-export default function AdminPage() {
+export default function AdminPage({ businessSlug = 'noir-barber' }: { businessSlug?: string }) {
   const [sessionReady, setSessionReady] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,7 +47,7 @@ export default function AdminPage() {
     if (!supabase) return;
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) { setBusiness(null); return; }
-    const { data, error } = await supabase.from('businesses').select('*').eq('slug', 'noir-barber').single();
+    const { data, error } = await supabase.from('businesses').select('*').eq('slug', businessSlug).single();
     if (error || !data) { setNotice('İşletme bulunamadı veya bu hesap için yetki tanımlanmamış. Supabase kurulum adımlarını kontrol et.'); return; }
     const b = data as Business;
     setBusiness(b);
@@ -91,7 +91,7 @@ export default function AdminPage() {
       const response = await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ role: 'owner', subscription }),
+        body: JSON.stringify({ role: 'owner', businessSlug, subscription }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Bildirim aboneliği kaydedilemedi.');
