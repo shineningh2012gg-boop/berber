@@ -25,6 +25,7 @@ export default function TrackClient({ initialCode = '' }: { initialCode?: string
   const [appointment, setAppointment] = useState<TrackedAppointment | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
 
   async function lookup(event: React.FormEvent) {
     event.preventDefault();
@@ -40,6 +41,26 @@ export default function TrackClient({ initialCode = '' }: { initialCode?: string
       setError(cause instanceof Error ? cause.message : 'Takip bilgisi alınamadı.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function cancelAppointment() {
+    if (!window.confirm('Randevunu iptal etmek istediğine emin misin?')) return;
+    setCancelBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/appointments/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, action: 'cancel' }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Randevu iptal edilemedi.');
+      setAppointment(current => current ? { ...current, status: 'cancelled' } : current);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Randevu iptal edilemedi.');
+    } finally {
+      setCancelBusy(false);
     }
   }
 
@@ -80,6 +101,7 @@ export default function TrackClient({ initialCode = '' }: { initialCode?: string
               {appointment.businessAddress && <div><dt>Adres</dt><dd>{appointment.businessAddress}</dd></div>}
               {appointment.businessPhone && <div><dt>Telefon</dt><dd>{appointment.businessPhone}</dd></div>}
             </dl>
+            {['pending','confirmed'].includes(appointment.status) && date.getTime() > Date.now() && <button type="button" className="button button-dark" onClick={cancelAppointment} disabled={cancelBusy}>{cancelBusy ? 'İptal ediliyor…' : 'Randevuyu iptal et'}</button>}
             <p className="track-note">Randevu durumunda değişiklik olursa bu sayfayı tekrar kontrol edebilirsin.</p>
           </div>
         )}
