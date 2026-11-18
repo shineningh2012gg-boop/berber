@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { role, subscription, appointmentId, notificationToken } = body || {};
+    const { role, subscription, appointmentId, notificationToken, businessSlug } = body || {};
 
     if (
       !subscription?.endpoint ||
@@ -46,17 +46,29 @@ export async function POST(request: NextRequest) {
       }
 
       userId = authData.user.id;
+      if (typeof businessSlug !== 'string' || !/^[a-z0-9-]{2,60}$/.test(businessSlug)) {
+        return NextResponse.json({ error: 'İşletme bağlantısı geçersiz.' }, { status: 400 });
+      }
+      const { data: business, error: businessError } = await admin
+        .from('businesses')
+        .select('id')
+        .eq('slug', businessSlug)
+        .maybeSingle();
+      if (businessError || !business) {
+        return NextResponse.json({ error: 'İşletme bulunamadı.' }, { status: 404 });
+      }
       const { data: membership, error: membershipError } = await admin
         .from('business_members')
         .select('business_id')
         .eq('user_id', userId)
-        .limit(1)
+        .eq('business_id', business.id)
+        .eq('role', 'owner')
         .maybeSingle();
 
       if (membershipError || !membership) {
-        return NextResponse.json({ error: 'İşletme yetkisi bulunamadı.' }, { status: 403 });
+        return NextResponse.json({ error: 'Bu işletme için sahip yetkisi bulunamadı.' }, { status: 403 });
       }
-      businessId = membership.business_id;
+      businessId = business.id;
     } else {
       if (
         typeof appointmentId !== 'string' || !/^[0-9a-f-]{36}$/i.test(appointmentId) ||
