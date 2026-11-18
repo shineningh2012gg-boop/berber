@@ -32,6 +32,10 @@ export default function AdminPage() {
   const [serviceName, setServiceName] = useState('');
   const [servicePrice, setServicePrice] = useState('450');
   const [serviceDuration, setServiceDuration] = useState('30');
+  const [editingService, setEditingService] = useState<string | null>(null);
+  const [editServiceName, setEditServiceName] = useState('');
+  const [editServicePrice, setEditServicePrice] = useState('');
+  const [editServiceDuration, setEditServiceDuration] = useState('');
   const [reviewName, setReviewName] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState('5');
@@ -112,6 +116,34 @@ export default function AdminPage() {
     setNotice(error ? 'Hizmet eklenemedi: ' + error.message : 'Hizmet eklendi.');
     if (!error) { setServiceName(''); await loadBusiness(); }
   }
+  function startServiceEdit(item: Service) {
+    setEditingService(item.id);
+    setEditServiceName(item.name);
+    setEditServicePrice(String(item.price));
+    setEditServiceDuration(String(item.duration_minutes));
+  }
+  async function saveServiceEdit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!supabase || !business || !editingService) return;
+    const price = Number(editServicePrice);
+    const duration = Number(editServiceDuration);
+    if (!editServiceName.trim() || !Number.isFinite(price) || price < 0 || !Number.isInteger(duration) || duration < 5 || duration > 480) {
+      setNotice('Hizmet adı, fiyat veya süre geçersiz.');
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.from('services')
+      .update({ name: editServiceName.trim(), price, duration_minutes: duration })
+      .eq('id', editingService)
+      .eq('business_id', business.id);
+    setNotice(error ? 'Hizmet güncellenemedi: ' + error.message : 'Hizmet güncellendi.');
+    setBusy(false);
+    if (!error) {
+      setEditingService(null);
+      await loadBusiness();
+    }
+  }
+
   async function toggleService(item: Service) {
     if (!supabase) return;
     const { error } = await supabase.from('services').update({ is_active: !item.is_active }).eq('id', item.id);
@@ -231,7 +263,7 @@ export default function AdminPage() {
   return <main className="admin-page"><header className="admin-header"><a className="brand" href="/"><span className="brand-mark">N</span><span>NOIR<span className="brand-light">BARBER</span></span></a><div><span>{business.name}</span><button onClick={enableOwnerNotifications}>Bildirimleri aç</button><button onClick={signOut}>Çıkış yap</button></div></header><div className="admin-layout"><aside className="admin-sidebar"><div className="admin-kicker">İŞLETME YÖNETİMİ</div>{tabs.map(item=><button key={item.id} className={tab===item.id?'selected':''} onClick={()=>setTab(item.id)}>{item.label}</button>)}</aside><section className="admin-content"><div className="admin-title"><div className="eyebrow dark-eyebrow">NOIR / CONTROL CENTER</div><h1>{tabs.find(x=>x.id===tab)?.label}</h1><p>İçerik ve işletme ayarlarını buradan yönet.</p></div>{notice && <div className="admin-notice">{notice}</div>}
 {tab==='overview' && <div className="admin-stats"><article><strong>{appointments.filter(x=>x.status==='pending').length}</strong><span>Bekleyen randevu</span></article><article><strong>{services.filter(x=>x.is_active).length}</strong><span>Aktif hizmet</span></article><article><strong>{reviews.filter(x=>x.is_published).length}</strong><span>Yayındaki yorum</span></article><article><strong>{gallery.length}</strong><span>Galeri fotoğrafı</span></article></div>}
 {tab==='profile' && <form className="admin-card admin-fields" onSubmit={saveProfile}><label>İşletme adı<input required value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/></label><label>Telefon<input value={profile.phone} onChange={e=>setProfile({...profile,phone:e.target.value})}/></label><label>Adres<input value={profile.address} onChange={e=>setProfile({...profile,address:e.target.value})}/></label><label>Instagram bağlantısı<input value={profile.instagram_url} onChange={e=>setProfile({...profile,instagram_url:e.target.value})}/></label><label>Google Maps bağlantısı<input value={profile.google_maps_url} onChange={e=>setProfile({...profile,google_maps_url:e.target.value})}/></label><label className="wide">Hakkımızda metni<textarea rows={4} value={profile.description} onChange={e=>setProfile({...profile,description:e.target.value})}/></label><label className="wide admin-publish"><input type="checkbox" checked={profile.is_published} onChange={e=>setProfile({...profile,is_published:e.target.checked})}/> Siteyi herkese açık yayınla</label><button className="button button-dark" disabled={busy}>Bilgileri kaydet</button></form>}
-{tab==='services' && <><form className="admin-card admin-fields" onSubmit={addService}><label>Hizmet adı<input required value={serviceName} onChange={e=>setServiceName(e.target.value)}/></label><label>Fiyat (₺)<input required type="number" min="0" value={servicePrice} onChange={e=>setServicePrice(e.target.value)}/></label><label>Süre (dakika)<input required type="number" min="5" max="480" value={serviceDuration} onChange={e=>setServiceDuration(e.target.value)}/></label><button className="button button-dark">Hizmet ekle</button></form><div className="admin-list">{services.map(item=><article key={item.id}><div><strong>{item.name}</strong><span>{item.price} ₺ · {item.duration_minutes} dk · {item.is_active?'Aktif':'Gizli'}</span></div><button onClick={()=>toggleService(item)}>{item.is_active?'Gizle':'Yayınla'}</button><button className="danger" onClick={()=>deleteService(item.id)}>Sil</button></article>)}</div></>}
+{tab==='services' && <><form className="admin-card admin-fields" onSubmit={addService}><label>Hizmet adı<input required value={serviceName} onChange={e=>setServiceName(e.target.value)}/></label><label>Fiyat (₺)<input required type="number" min="0" value={servicePrice} onChange={e=>setServicePrice(e.target.value)}/></label><label>Süre (dakika)<input required type="number" min="5" max="480" value={serviceDuration} onChange={e=>setServiceDuration(e.target.value)}/></label><button className="button button-dark">Hizmet ekle</button></form><div className="admin-list">{services.map(item=><article key={item.id}>{editingService===item.id ? <form className="service-edit" onSubmit={saveServiceEdit}><input aria-label="Hizmet adı" required value={editServiceName} onChange={e=>setEditServiceName(e.target.value)}/><input aria-label="Fiyat" type="number" min="0" required value={editServicePrice} onChange={e=>setEditServicePrice(e.target.value)}/><input aria-label="Süre dakika" type="number" min="5" max="480" required value={editServiceDuration} onChange={e=>setEditServiceDuration(e.target.value)}/><button disabled={busy}>Kaydet</button><button type="button" onClick={()=>setEditingService(null)}>Vazgeç</button></form> : <div><strong>{item.name}</strong><span>{item.price} ₺ · {item.duration_minutes} dk · {item.is_active?'Aktif':'Gizli'}</span></div>}<button onClick={()=>startServiceEdit(item)}>Düzenle</button><button onClick={()=>toggleService(item)}>{item.is_active?'Gizle':'Yayınla'}</button><button className="danger" onClick={()=>deleteService(item.id)}>Sil</button></article>)}</div></>}
 {tab==='reviews' && <><form className="admin-card admin-fields" onSubmit={addReview}><label>Müşteri adı<input required value={reviewName} onChange={e=>setReviewName(e.target.value)}/></label><label>Puan<select value={reviewRating} onChange={e=>setReviewRating(e.target.value)}>{[5,4,3,2,1].map(n=><option key={n} value={n}>{n} / 5</option>)}</select></label><label className="wide">Yorum<textarea required rows={3} value={reviewText} onChange={e=>setReviewText(e.target.value)}/></label><button className="button button-dark">Manuel yorum ekle</button><small className="wide">Yalnızca gerçek müşterilerden alınan ve paylaşım izni bulunan yorumları ekle. Manuel yorumlar Google yorumu olarak etiketlenmez.</small></form><div className="admin-list">{reviews.map(item=><article key={item.id}><div><strong>{item.customer_name} · {'★'.repeat(item.rating)}</strong><span>{item.review_text}</span><small>{item.source==='google'?'Google kaynağı':'Manuel ekleme'}</small></div><button onClick={()=>toggleReview(item)}>{item.is_published?'Gizle':'Yayınla'}</button><button className="danger" onClick={()=>deleteReview(item.id)}>Sil</button></article>)}</div></>}
 {tab==='gallery' && <><form className="admin-card admin-fields" onSubmit={addImage}><label className="wide">Bilgisayarından fotoğraf seç<input type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setImageFile(e.target.files?.[0] || null)}/></label><label className="wide">Fotoğraf açıklaması<input value={imageAlt} onChange={e=>setImageAlt(e.target.value)} placeholder="Örn. Salon içi"/></label><button className="button button-dark" disabled={busy || !imageFile}>{busy ? 'Yükleniyor…' : 'Fotoğraf yükle'}</button><small className="wide">JPG, PNG veya WebP · En fazla 5 MB. Fotoğraflar güvenli şekilde işletmenin galerisine yüklenir.</small></form><div className="admin-gallery">{gallery.map((item,index)=><article key={item.id}><img src={item.image_url} alt={item.alt_text}/><div><span>{item.alt_text || 'Galeri görseli'}</span><button disabled={index===0} onClick={()=>moveImage(item,-1)}>↑</button><button disabled={index===gallery.length-1} onClick={()=>moveImage(item,1)}>↓</button><button className="danger" onClick={()=>deleteImage(item)}>Kaldır</button></div></article>)}</div></>}
 {tab==='appointments' && <div className="admin-list">{appointments.length===0 && <p>Henüz randevu kaydı yok.</p>}{appointments.map(item=><article key={item.id}><div><strong>{item.customer_name} · {item.service_name}</strong><span>{item.customer_phone} · {new Date(item.starts_at).toLocaleString('tr-TR')}</span><small>Durum: {item.status}</small></div><button onClick={()=>setAppointmentStatus(item,'confirmed')}>Onayla</button><button onClick={()=>setAppointmentStatus(item,'rejected')}>Reddet</button><button onClick={()=>setAppointmentStatus(item,'completed')}>Tamamlandı</button><button className="danger" onClick={()=>setAppointmentStatus(item,'cancelled')}>İptal et</button></article>)}</div>}
