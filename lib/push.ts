@@ -68,6 +68,11 @@ export async function notifyBusinessOwnersForAppointment(appointmentId: string) 
   if (appointmentError || !appointment) {
     throw appointmentError || new Error('Appointment not found.');
   }
+  const { data: business } = await admin
+    .from('businesses')
+    .select('slug')
+    .eq('id', appointment.business_id)
+    .maybeSingle();
 
   const { data, error } = await admin
     .from('push_subscriptions')
@@ -81,7 +86,7 @@ export async function notifyBusinessOwnersForAppointment(appointmentId: string) 
     (data || []) as PushSubscriptionRow[],
     'Yeni randevu!',
     'NOIR BARBER sistemine yeni bir randevu geldi.',
-    '/admin'
+    business?.slug ? `/admin/${business.slug}` : '/admin'
   );
 }
 
