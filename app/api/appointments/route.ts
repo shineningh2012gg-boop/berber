@@ -42,7 +42,9 @@ export async function GET(request: NextRequest) {
     let cursor = openHour * 60 + openMinute;
     const close = closeHour * 60 + closeMinute;
     while (cursor + Number(service.duration_minutes) <= close) {
-      if (!(cursor >= 12 * 60 && cursor < 13 * 60)) {
+      const crossesLunchBreak = cursor < 12 * 60 && cursor + Number(service.duration_minutes) > 12 * 60;
+      const startsDuringLunchBreak = cursor >= 12 * 60 && cursor < 13 * 60;
+      if (!crossesLunchBreak && !startsDuringLunchBreak) {
         allSlots.push(`${String(Math.floor(cursor / 60)).padStart(2, '0')}:${String(cursor % 60).padStart(2, '0')}`);
       }
       cursor += 60;
