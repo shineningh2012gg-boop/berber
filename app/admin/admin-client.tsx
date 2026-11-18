@@ -8,7 +8,7 @@ type Tab = 'overview' | 'profile' | 'services' | 'reviews' | 'gallery' | 'appoin
 type Business = { id: string; name: string; slug: string; phone: string | null; address: string | null; instagram_url: string | null; google_maps_url: string | null; description: string | null; opening_hours: Record<string,string> | null; is_published: boolean };
 type Service = { id: string; name: string; price: number; duration_minutes: number; is_active: boolean };
 type Review = { id: string; customer_name: string; review_text: string; rating: number; source: string; is_published: boolean };
-type Gallery = { id: string; image_url: string; alt_text: string; is_published: boolean };
+type Gallery = { id: string; image_url: string; storage_path: string | null; alt_text: string; is_published: boolean; sort_order: number };
 type Appointment = { id: string; customer_name: string; customer_phone: string; service_name: string; starts_at: string; status: string };
 
 const tabs: { id: Tab; label: string }[] = [
@@ -35,7 +35,7 @@ export default function AdminPage() {
   const [reviewName, setReviewName] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState('5');
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageAlt, setImageAlt] = useState('');
   const [profile, setProfile] = useState({ name: '', phone: '', address: '', instagram_url: '', google_maps_url: '', description: '', is_published: false });
 
@@ -139,15 +139,76 @@ export default function AdminPage() {
     setNotice(error ? error.message : 'Yorum silindi.'); if (!error) await loadBusiness();
   }
   async function addImage(e: React.FormEvent) {
-    e.preventDefault(); if (!supabase || !business) return;
-    const { error } = await supabase.from('gallery_images').insert({ business_id: business.id, image_url: imageUrl.trim(), alt_text: imageAlt.trim(), is_published: true, sort_order: gallery.length });
-    setNotice(error ? 'Fotoğraf eklenemedi: ' + error.message : 'Fotoğraf eklendi.');
-    if (!error) { setImageUrl(''); setImageAlt(''); await loadBusiness(); }
+    e.preventDefault();
+    if (!supabase || !business || !imageFile) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(imageFile.type)) {
+      setNotice('Yalnızca JPG, PNG veya WebP fotoğraf yükleyebilirsin.');
+      return;
+    }
+    if (imageFile.size > 5 * 1024 * 1024) {
+      setNotice('Fotoğraf en fazla 5 MB olabilir.');
+      return;
+    }
+    setBusy(true);
+    const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+    const storagePath = `${business.id}/${crypto.randomUUID()}-${safeName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('business-gallery')
+      .upload(storagePath, imageFile, {
+        cacheControl: '3600',
+        contentType: imageFile.type,
+        upsert: false,
+      });
+    if (uploadError) {
+      setNotice('Fotoğraf yüklenemedi: ' + uploadError.message);
+      setBusy(false);
+      return;
+    }
+    const { data: publicData } = supabase.storage.from('business-gallery').getPublicUrl(storagePath);
+    const { error: insertError } = await supabase.from('gallery_images').insert({
+      business_id: business.id,
+      image_url: publicData.publicUrl,
+      storage_path: storagePath,
+      alt_text: imageAlt.trim(),
+      is_published: true,
+      sort_order: gallery.length,
+    });
+    if (insertError) {
+      await supabase.storage.from('business-gallery').remove([storagePath]);
+      setNotice('Fotoğraf kaydı oluşturulamadı: ' + insertError.message);
+    } else {
+      setNotice('Fotoğraf eklendi.');
+      setImageFile(null);
+      setImageAlt('');
+      await loadBusiness();
+    }
+    setBusy(false);
   }
-  async function deleteImage(id: string) {
+  async function deleteImage(item: Gallery) {
     if (!supabase || !window.confirm('Bu fotoğraf galeriden kaldırılsın mı?')) return;
-    const { error } = await supabase.from('gallery_images').delete().eq('id', id);
-    setNotice(error ? error.message : 'Fotoğraf kaldırıldı.'); if (!error) await loadBusiness();
+    if (item.storage_path) {
+      const { error: storageError } = await supabase.storage.from('business-gallery').remove([item.storage_path]);
+      if (storageError) {
+        setNotice('Fotoğraf dosyası silinemedi: ' + storageError.message);
+        return;
+      }
+    }
+    const { error } = await supabase.from('gallery_images').delete().eq('id', item.id);
+    setNotice(error ? 'Fotoğraf kaydı silinemedi: ' + error.message : 'Fotoğraf kaldırıldı.');
+    if (!error) await loadBusiness();
+  }
+  async function moveImage(item: Gallery, direction: -1 | 1) {
+    if (!supabase) return;
+    const currentIndex = gallery.findIndex(image => image.id === item.id);
+    const target = gallery[currentIndex + direction];
+    if (!target) return;
+    const updates = await Promise.all([
+      supabase.from('gallery_images').update({ sort_order: target.sort_order }).eq('id', item.id),
+      supabase.from('gallery_images').update({ sort_order: item.sort_order }).eq('id', target.id),
+    ]);
+    const error = updates.find(result => result.error)?.error;
+    setNotice(error ? 'Fotoğraf sırası değiştirilemedi: ' + error.message : 'Fotoğraf sırası güncellendi.');
+    if (!error) await loadBusiness();
   }
   async function setAppointmentStatus(item: Appointment, status: string) {
     if (!supabase) return;
@@ -172,7 +233,7 @@ export default function AdminPage() {
 {tab==='profile' && <form className="admin-card admin-fields" onSubmit={saveProfile}><label>İşletme adı<input required value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/></label><label>Telefon<input value={profile.phone} onChange={e=>setProfile({...profile,phone:e.target.value})}/></label><label>Adres<input value={profile.address} onChange={e=>setProfile({...profile,address:e.target.value})}/></label><label>Instagram bağlantısı<input value={profile.instagram_url} onChange={e=>setProfile({...profile,instagram_url:e.target.value})}/></label><label>Google Maps bağlantısı<input value={profile.google_maps_url} onChange={e=>setProfile({...profile,google_maps_url:e.target.value})}/></label><label className="wide">Hakkımızda metni<textarea rows={4} value={profile.description} onChange={e=>setProfile({...profile,description:e.target.value})}/></label><label className="wide admin-publish"><input type="checkbox" checked={profile.is_published} onChange={e=>setProfile({...profile,is_published:e.target.checked})}/> Siteyi herkese açık yayınla</label><button className="button button-dark" disabled={busy}>Bilgileri kaydet</button></form>}
 {tab==='services' && <><form className="admin-card admin-fields" onSubmit={addService}><label>Hizmet adı<input required value={serviceName} onChange={e=>setServiceName(e.target.value)}/></label><label>Fiyat (₺)<input required type="number" min="0" value={servicePrice} onChange={e=>setServicePrice(e.target.value)}/></label><label>Süre (dakika)<input required type="number" min="5" max="480" value={serviceDuration} onChange={e=>setServiceDuration(e.target.value)}/></label><button className="button button-dark">Hizmet ekle</button></form><div className="admin-list">{services.map(item=><article key={item.id}><div><strong>{item.name}</strong><span>{item.price} ₺ · {item.duration_minutes} dk · {item.is_active?'Aktif':'Gizli'}</span></div><button onClick={()=>toggleService(item)}>{item.is_active?'Gizle':'Yayınla'}</button><button className="danger" onClick={()=>deleteService(item.id)}>Sil</button></article>)}</div></>}
 {tab==='reviews' && <><form className="admin-card admin-fields" onSubmit={addReview}><label>Müşteri adı<input required value={reviewName} onChange={e=>setReviewName(e.target.value)}/></label><label>Puan<select value={reviewRating} onChange={e=>setReviewRating(e.target.value)}>{[5,4,3,2,1].map(n=><option key={n} value={n}>{n} / 5</option>)}</select></label><label className="wide">Yorum<textarea required rows={3} value={reviewText} onChange={e=>setReviewText(e.target.value)}/></label><button className="button button-dark">Manuel yorum ekle</button><small className="wide">Yalnızca gerçek müşterilerden alınan ve paylaşım izni bulunan yorumları ekle. Manuel yorumlar Google yorumu olarak etiketlenmez.</small></form><div className="admin-list">{reviews.map(item=><article key={item.id}><div><strong>{item.customer_name} · {'★'.repeat(item.rating)}</strong><span>{item.review_text}</span><small>{item.source==='google'?'Google kaynağı':'Manuel ekleme'}</small></div><button onClick={()=>toggleReview(item)}>{item.is_published?'Gizle':'Yayınla'}</button><button className="danger" onClick={()=>deleteReview(item.id)}>Sil</button></article>)}</div></>}
-{tab==='gallery' && <><form className="admin-card admin-fields" onSubmit={addImage}><label className="wide">Fotoğraf URL<input type="url" required placeholder="https://…" value={imageUrl} onChange={e=>setImageUrl(e.target.value)}/></label><label className="wide">Fotoğraf açıklaması<input value={imageAlt} onChange={e=>setImageAlt(e.target.value)}/></label><button className="button button-dark">Fotoğraf ekle</button><small className="wide">Bu ilk sürümde görseller URL ile eklenir. Dosya yükleme alanı Supabase Storage kurulunca etkinleştirilecek.</small></form><div className="admin-gallery">{gallery.map(item=><article key={item.id}><img src={item.image_url} alt={item.alt_text}/><div><span>{item.alt_text || 'Galeri görseli'}</span><button className="danger" onClick={()=>deleteImage(item.id)}>Kaldır</button></div></article>)}</div></>}
-{tab==='appointments' && <div className="admin-list">{appointments.length===0 && <p>Henüz randevu kaydı yok.</p>}{appointments.map(item=><article key={item.id}><div><strong>{item.customer_name} · {item.service_name}</strong><span>{item.customer_phone} · {new Date(item.starts_at).toLocaleString('tr-TR')}</span><small>Durum: {item.status}</small></div><button onClick={()=>setAppointmentStatus(item,'confirmed')}>Onayla</button><button className="danger" onClick={()=>setAppointmentStatus(item,'cancelled')}>İptal et</button></article>)}</div>}
+{tab==='gallery' && <><form className="admin-card admin-fields" onSubmit={addImage}><label className="wide">Bilgisayarından fotoğraf seç<input type="file" accept="image/jpeg,image/png,image/webp" required onChange={e=>setImageFile(e.target.files?.[0] || null)}/></label><label className="wide">Fotoğraf açıklaması<input value={imageAlt} onChange={e=>setImageAlt(e.target.value)} placeholder="Örn. Salon içi"/></label><button className="button button-dark" disabled={busy || !imageFile}>{busy ? 'Yükleniyor…' : 'Fotoğraf yükle'}</button><small className="wide">JPG, PNG veya WebP · En fazla 5 MB. Fotoğraflar güvenli şekilde işletmenin galerisine yüklenir.</small></form><div className="admin-gallery">{gallery.map((item,index)=><article key={item.id}><img src={item.image_url} alt={item.alt_text}/><div><span>{item.alt_text || 'Galeri görseli'}</span><button disabled={index===0} onClick={()=>moveImage(item,-1)}>↑</button><button disabled={index===gallery.length-1} onClick={()=>moveImage(item,1)}>↓</button><button className="danger" onClick={()=>deleteImage(item)}>Kaldır</button></div></article>)}</div></>}
+{tab==='appointments' && <div className="admin-list">{appointments.length===0 && <p>Henüz randevu kaydı yok.</p>}{appointments.map(item=><article key={item.id}><div><strong>{item.customer_name} · {item.service_name}</strong><span>{item.customer_phone} · {new Date(item.starts_at).toLocaleString('tr-TR')}</span><small>Durum: {item.status}</small></div><button onClick={()=>setAppointmentStatus(item,'confirmed')}>Onayla</button><button onClick={()=>setAppointmentStatus(item,'rejected')}>Reddet</button><button onClick={()=>setAppointmentStatus(item,'completed')}>Tamamlandı</button><button className="danger" onClick={()=>setAppointmentStatus(item,'cancelled')}>İptal et</button></article>)}</div>}
 </section></div></main>;
 }
