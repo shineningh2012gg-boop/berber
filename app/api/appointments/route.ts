@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
       || body.phone.trim().length < 10 || body.phone.trim().length > 24) {
     return NextResponse.json({ error: 'Lütfen ad, telefon ve randevu bilgilerini kontrol et.' }, { status: 400 });
   }
-  const notificationToken = randomBytes(32).toString('hex');
+  const notificationToken = randomBytes(24).toString('hex');
+  const trackingCode = 'NOIR-' + notificationToken.match(/.{1,6}/g)!.join('-');
   const notificationTokenHash = createHash('sha256').update(notificationToken).digest('hex');
 
   const { data, error } = await supabase.rpc('create_public_appointment', {
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
   }
   return NextResponse.json(
-    { ok: true, appointment: data, notificationToken },
+    { ok: true, appointment: data, notificationToken, trackingCode },
     { status: 201 }
   );
 }
