@@ -93,11 +93,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Bu randevu artık iptal edilemiyor.' }, { status: 409 });
   }
 
-  const { error: updateError } = await admin.from('appointments')
+  const { data: updatedAppointment, error: updateError } = await admin.from('appointments')
     .update({ status: 'cancelled' })
     .eq('id', appointment.id)
-    .eq('status', appointment.status);
+    .eq('status', appointment.status)
+    .select('id')
+    .maybeSingle();
   if (updateError) return NextResponse.json({ error: 'Randevu iptal edilemedi.' }, { status: 500 });
+  if (!updatedAppointment) return NextResponse.json({ error: 'Randevu durumu değişti. Sayfayı yenileyip tekrar kontrol et.' }, { status: 409 });
 
   try { await notifyBusinessOwnersForAppointmentCancellation(appointment.id); }
   catch (notificationError) { console.error('Could not notify business owner about cancellation:', notificationError); }
