@@ -85,7 +85,10 @@ export async function notifyBusinessOwnersForAppointment(appointmentId: string) 
   );
 }
 
-export async function notifyAppointmentCustomer(appointmentId: string) {
+export async function notifyAppointmentCustomer(
+  appointmentId: string,
+  status: 'confirmed' | 'rejected' | 'cancelled' | 'completed' = 'confirmed'
+) {
   const admin = getAdmin();
   const { data, error } = await admin
     .from('push_subscriptions')
@@ -95,10 +98,16 @@ export async function notifyAppointmentCustomer(appointmentId: string) {
 
   if (error) throw error;
 
+  const messages = {
+    confirmed: { title: 'Randevun onaylandı!', body: 'İşletme randevunu kabul etti.' },
+    rejected: { title: 'Randevu talebin reddedildi', body: 'Randevunun durumu güncellendi. Ayrıntıları takip sayfasından görebilirsin.' },
+    cancelled: { title: 'Randevun iptal edildi', body: 'Randevunun durumu güncellendi. Ayrıntıları takip sayfasından görebilirsin.' },
+    completed: { title: 'Randevun tamamlandı', body: 'Ziyaretin için teşekkür ederiz.' },
+  };
   await sendToSubscriptions(
     (data || []) as PushSubscriptionRow[],
-    'Randevun onaylandı!',
-    'NOIR BARBER randevunu kabul etti.',
-    '/'
+    messages[status].title,
+    messages[status].body,
+    '/track'
   );
 }
