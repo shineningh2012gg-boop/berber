@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     .replace(/-/g, '')
     .toLowerCase();
 
-  if (!/^[0-9a-f]{48}$/.test(rawCode)) {
+  if (!/^[0-9a-f]{24}$/.test(rawCode)) {
     return NextResponse.json({ error: 'Takip kodunu kontrol et.' }, { status: 400 });
   }
 
