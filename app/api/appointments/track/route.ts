@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
   }
 
   const rawCode = body.code.trim().toUpperCase().replace(/^NOIR-/, '').replace(/-/g, '').toLowerCase();
-  if (!/^[0-9a-f]{48}$/.test(rawCode)) {
+  if (!/^[0-9a-f]{24}$/.test(rawCode)) {
     return NextResponse.json({ error: 'Takip kodunu kontrol et.' }, { status: 400 });
   }
 
