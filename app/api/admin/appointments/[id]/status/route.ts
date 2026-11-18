@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: 'Randevu kimliği geçersiz.' }, { status: 400 });
   let body: { status?: string };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'İstek okunamadı.' }, { status: 400 }); }
-  if (body.status !== 'confirmed' && body.status !== 'cancelled') {
+  if (!['confirmed', 'rejected', 'cancelled', 'completed'].includes(body.status || '')) {
     return NextResponse.json({ error: 'Randevu durumu geçersiz.' }, { status: 400 });
   }
 
