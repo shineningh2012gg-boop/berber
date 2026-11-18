@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     let userId: string | null = null;
 
     if (role === 'owner') {
-      const token = request.headers.get('authorization')?.replace(/^Bearer\\s+/i, '');
+      const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
       if (!token) return NextResponse.json({ error: 'Giriş gerekli.' }, { status: 401 });
 
       const authClient = createClient(url, anonKey, {
