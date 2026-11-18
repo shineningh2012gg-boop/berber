@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const date = request.nextUrl.searchParams.get('date') || '';
   const serviceId = request.nextUrl.searchParams.get('serviceId') || '';
   const businessSlug = request.nextUrl.searchParams.get('businessSlug') || 'noir-barber';
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !/^[0-9a-f-]{36}$/i.test(serviceId) || !/^[a-z0-9-]{2,60}$/.test(businessSlug)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^[0-9a-f-]{36}$/i.test(serviceId) || !/^[a-z0-9-]{2,60}$/.test(businessSlug)) {
     return NextResponse.json({ error: 'Tarih veya hizmet seçimi geçersiz.' }, { status: 400 });
   }
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   const dayKey = String(day === 0 ? 7 : day);
   const hours = business.opening_hours?.[dayKey] ?? (day >= 1 && day <= 6 ? '09:00-19:00' : 'closed');
   const allSlots: string[] = [];
-  if (typeof hours === 'string' && /^([01]\\d|2[0-3]):[0-5]\\d-([01]\\d|2[0-3]):[0-5]\\d$/.test(hours)) {
+  if (typeof hours === 'string' && /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/.test(hours)) {
     const [openText, closeText] = hours.split('-');
     const [openHour, openMinute] = openText.split(':').map(Number);
     const [closeHour, closeMinute] = closeText.split(':').map(Number);
