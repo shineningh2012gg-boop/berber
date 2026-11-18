@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   }
   const businessSlug = body.businessSlug || 'noir-barber';
   if (!/^[a-z0-9-]{2,60}$/.test(businessSlug)) return NextResponse.json({ error: 'İşletme bağlantısı geçersiz.' }, { status: 400 });
-  const notificationToken = randomBytes(24).toString('hex');
+  const notificationToken = randomBytes(12).toString('hex');
   const trackingCode = 'NOIR-' + notificationToken.match(/.{1,6}/g)!.join('-');
   const notificationTokenHash = createHash('sha256').update(notificationToken).digest('hex');
 
