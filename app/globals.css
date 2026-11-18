@@ -124,3 +124,6 @@ body{color:#000}
 .opening-hours-editor label{display:grid;gap:6px;font-size:10px;color:#666}
 .opening-hours-editor input{width:100%;padding:9px;border:1px solid #ddd;background:#fff;color:#171717;font-size:11px}
 @media(max-width:560px){.opening-hours-editor{grid-template-columns:1fr}.service-edit{flex-basis:100%}}
+
+.review-edit{display:grid;gap:8px;flex:1;min-width:220px}
+.review-edit input,.review-edit select,.review-edit textarea{width:100%;padding:9px;border:1px solid #ddd;background:#fff;color:#171717;font:inherit;font-size:11px}
