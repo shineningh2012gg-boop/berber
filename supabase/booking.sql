@@ -131,3 +131,36 @@ revoke all on function public.get_public_available_slots(date,uuid,text) from pu
 revoke all on function public.create_public_appointment(text,text,uuid,timestamptz,text,text) from public;
 grant execute on function public.get_public_available_slots(date,uuid,text) to anon,authenticated;
 grant execute on function public.create_public_appointment(text,text,uuid,timestamptz,text,text) to anon,authenticated;
+
+
+-- Push subscription identity allows one browser to follow several appointments.
+alter table public.push_subscriptions
+  add column if not exists subscription_key text;
+
+update public.push_subscriptions
+set subscription_key = role || ':' ||
+  coalesce(appointment_id::text, business_id::text) || ':' || md5(endpoint)
+where subscription_key is null;
+
+alter table public.push_subscriptions
+  alter column subscription_key set not null;
+
+alter table public.push_subscriptions
+  drop constraint if exists push_subscriptions_endpoint_key;
+
+create unique index if not exists push_subscriptions_subscription_key_idx
+  on public.push_subscriptions (subscription_key);
+
+
+-- Business maintenance checklist.
+create table if not exists public.maintenance_tasks (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  title text not null check (char_length(trim(title)) between 2 and 120),
+  is_completed boolean not null default false,
+  due_date date,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+create index if not exists maintenance_tasks_business_created_idx
+  on public.maintenance_tasks (business_id, created_at desc);
