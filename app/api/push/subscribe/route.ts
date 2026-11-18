@@ -91,7 +91,10 @@ export async function POST(request: NextRequest) {
       businessId = appointment.business_id;
     }
 
+    const scopeId = role === 'customer' ? appointmentId : businessId;
+    const subscriptionKey = `${role}:${scopeId}:${createHash('sha256').update(subscription.endpoint).digest('hex')}`;
     const { error } = await admin.from('push_subscriptions').upsert({
+      subscription_key: subscriptionKey,
       business_id: businessId,
       appointment_id: role === 'customer' ? appointmentId : null,
       user_id: userId,
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
       p256dh: subscription.keys.p256dh,
       auth: subscription.keys.auth,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'endpoint' });
+    }, { onConflict: 'subscription_key' });
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
