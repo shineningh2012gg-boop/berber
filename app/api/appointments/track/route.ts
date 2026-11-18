@@ -1,0 +1,63 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    return NextResponse.json({ error: 'Takip sistemi şu anda kullanılamıyor.' }, { status: 503 });
+  }
+
+  const suppliedCode = request.nextUrl.searchParams.get('code') || '';
+  const rawCode = suppliedCode
+    .trim()
+    .toUpperCase()
+    .replace(/^NOIR-/, '')
+    .replace(/-/g, '')
+    .toLowerCase();
+
+  if (!/^[0-9a-f]{48}$/.test(rawCode)) {
+    return NextResponse.json({ error: 'Takip kodunu kontrol et.' }, { status: 400 });
+  }
+
+  const tokenHash = createHash('sha256').update(rawCode).digest('hex');
+  const admin = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: appointment, error } = await admin
+    .from('appointments')
+    .select('id, business_id, customer_name, service_name, starts_at, duration_minutes, status')
+    .eq('notification_token_hash', tokenHash)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Appointment tracking lookup failed:', error);
+    return NextResponse.json({ error: 'Randevu bilgisi şu anda alınamıyor.' }, { status: 500 });
+  }
+  if (!appointment) {
+    return NextResponse.json({ error: 'Bu kodla eşleşen bir randevu bulunamadı.' }, { status: 404 });
+  }
+
+  const { data: business } = await admin
+    .from('businesses')
+    .select('name, address, phone')
+    .eq('id', appointment.business_id)
+    .maybeSingle();
+
+  return NextResponse.json({
+    appointment: {
+      serviceName: appointment.service_name,
+      startsAt: appointment.starts_at,
+      durationMinutes: appointment.duration_minutes,
+      status: appointment.status,
+      businessName: business?.name || 'NOIR BARBER',
+      businessAddress: business?.address || null,
+      businessPhone: business?.phone || null,
+    },
+  }, { headers: { 'Cache-Control': 'no-store' } });
+}
