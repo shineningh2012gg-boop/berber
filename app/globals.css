@@ -127,3 +127,5 @@ body{color:#000}
 
 .review-edit{display:grid;gap:8px;flex:1;min-width:220px}
 .review-edit input,.review-edit select,.review-edit textarea{width:100%;padding:9px;border:1px solid #ddd;background:#fff;color:#171717;font:inherit;font-size:11px}
+
+.copy-tracking{justify-self:start;border:0;background:transparent;color:#d8bd91;text-decoration:underline;font-size:11px;cursor:pointer}
