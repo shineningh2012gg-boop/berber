@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     } else {
       if (
         typeof appointmentId !== 'string' || !/^[0-9a-f-]{36}$/i.test(appointmentId) ||
-        typeof notificationToken !== 'string' || !/^[0-9a-f]{64}$/.test(notificationToken)
+        typeof notificationToken !== 'string' || !/^[0-9a-f]{48}$/.test(notificationToken)
       ) {
         return NextResponse.json({ error: 'Randevu doğrulama bilgisi geçersiz.' }, { status: 400 });
       }
