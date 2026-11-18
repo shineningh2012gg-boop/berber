@@ -10,7 +10,7 @@ type Service = { id: string; name: string; price: number; duration_minutes: numb
 type Review = { id: string; customer_name: string; review_text: string; rating: number; source: string; is_published: boolean };
 type Gallery = { id: string; image_url: string; storage_path: string | null; alt_text: string; is_published: boolean; sort_order: number };
 type Appointment = { id: string; customer_name: string; customer_phone: string; service_name: string; starts_at: string; status: string };
-type MaintenanceTask = { id: string; title: string; is_completed: boolean; due_date: string | null };
+type MaintenanceTask = { id: string; title: string; is_completed: boolean; due_date: string | null; completed_at: string | null };
 
 const defaultOpeningHours: Record<string, string> = { '1': '09:00-19:00', '2': '09:00-19:00', '3': '09:00-19:00', '4': '09:00-19:00', '5': '09:00-19:00', '6': '09:00-19:00', '7': 'closed' };
 const openingDays = [{ key: '1', label: 'Pazartesi' }, { key: '2', label: 'Salı' }, { key: '3', label: 'Çarşamba' }, { key: '4', label: 'Perşembe' }, { key: '5', label: 'Cuma' }, { key: '6', label: 'Cumartesi' }, { key: '7', label: 'Pazar' }];
