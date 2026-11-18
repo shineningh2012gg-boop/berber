@@ -127,6 +127,15 @@ export default function AdminPage({ businessSlug = 'noir-barber' }: { businessSl
         setBusy(false);
         return;
       }
+      if (value !== 'closed') {
+        const [openText, closeText] = value.split('-');
+        const toMinutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+        if (toMinutes(openText) >= toMinutes(closeText)) {
+          setNotice(day.label + ' için kapanış saati açılış saatinden sonra olmalı.');
+          setBusy(false);
+          return;
+        }
+      }
     }
     const { error } = await supabase.from('businesses').update({ ...profile, opening_hours: openingHours }).eq('id', business.id);
     setNotice(error ? 'Kaydedilemedi: ' + error.message : 'İşletme bilgileri kaydedildi.');
