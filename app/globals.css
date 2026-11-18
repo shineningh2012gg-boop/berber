@@ -114,3 +114,13 @@ body{color:#000}
 .track-result dd{margin:0;text-align:right;font-size:12px;font-weight:600}
 .track-note{margin-top:20px;font-size:11px;color:#888;line-height:1.6}
 @media(max-width:560px){.track-page{padding:22px 14px}.track-card{padding:24px 18px}.track-status{align-items:flex-start;flex-direction:column}.track-result dl>div{gap:10px}.track-result dd{max-width:60%}}
+
+.service-edit{display:flex;flex-wrap:wrap;gap:8px;flex:1;min-width:220px}
+.service-edit input{min-width:80px;max-width:150px;padding:8px;border:1px solid #ddd;background:#fff;color:#171717;font-size:11px}
+.opening-hours-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:18px;border:1px solid #e9e7e3;background:#faf9f7}
+.opening-hours-editor>strong,.opening-hours-editor>small{grid-column:1/-1}
+.opening-hours-editor>strong{font-size:12px}
+.opening-hours-editor>small{font-size:10px;color:#777}
+.opening-hours-editor label{display:grid;gap:6px;font-size:10px;color:#666}
+.opening-hours-editor input{width:100%;padding:9px;border:1px solid #ddd;background:#fff;color:#171717;font-size:11px}
+@media(max-width:560px){.opening-hours-editor{grid-template-columns:1fr}.service-edit{flex-basis:100%}}
