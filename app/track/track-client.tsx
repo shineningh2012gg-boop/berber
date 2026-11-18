@@ -78,7 +78,7 @@ export default function TrackClient({ initialCode = '' }: { initialCode?: string
             <input
               value={code}
               onChange={event => setCode(event.target.value.toUpperCase())}
-              placeholder="NOIR-XXXXXX-XXXXXX-..."
+              placeholder="NOIR-XXXXXX-XXXXXX-XXXXXX-XXXXXX"
               autoComplete="off"
               required
             />
