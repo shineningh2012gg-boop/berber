@@ -39,12 +39,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const { error: updateError } = await supabase.from('appointments').update({ status: body.status }).eq('id', id);
   if (updateError) return NextResponse.json({ error: 'Randevu durumu güncellenemedi.' }, { status: 500 });
 
-  if (body.status === 'confirmed') {
-    try {
-      await notifyAppointmentCustomer(id);
-    } catch (notificationError) {
-      console.error('Could not notify appointment customer:', notificationError);
-    }
+  try {
+    await notifyAppointmentCustomer(id, body.status as 'confirmed' | 'rejected' | 'cancelled' | 'completed');
+  } catch (notificationError) {
+    console.error('Could not notify appointment customer:', notificationError);
   }
 
   return NextResponse.json({ ok: true });
