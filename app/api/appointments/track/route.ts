@@ -6,49 +6,45 @@ import { notifyBusinessOwnersForAppointmentCancellation } from '@/lib/push';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+function getTokenHash(code: string) {
+  const rawCode = code.trim().toUpperCase().replace(/^NOIR-/, '').replace(/-/g, '').toLowerCase();
+  if (!/^[0-9a-f]{24}$/.test(rawCode)) return null;
+  return createHash('sha256').update(rawCode).digest('hex');
+}
+
+export async function GET(request: NextRequest) {
+  const supabase = getSupabase();
+  if (!supabase) {
     return NextResponse.json({ error: 'Takip sistemi şu anda kullanılamıyor.' }, { status: 503 });
   }
 
-  const suppliedCode = request.nextUrl.searchParams.get('code') || '';
-  const rawCode = suppliedCode
-    .trim()
-    .toUpperCase()
-    .replace(/^NOIR-/, '')
-    .replace(/-/g, '')
-    .toLowerCase();
-
-  if (!/^[0-9a-f]{24}$/.test(rawCode)) {
+  const tokenHash = getTokenHash(request.nextUrl.searchParams.get('code') || '');
+  if (!tokenHash) {
     return NextResponse.json({ error: 'Takip kodunu kontrol et.' }, { status: 400 });
   }
 
-  const tokenHash = createHash('sha256').update(rawCode).digest('hex');
-  const admin = createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
+  const { data, error } = await supabase.rpc('get_public_appointment_by_token', {
+    p_token_hash: tokenHash,
   });
 
-  const { data: appointment, error } = await admin
-    .from('appointments')
-    .select('id, business_id, customer_name, service_name, starts_at, duration_minutes, status')
-    .eq('notification_token_hash', tokenHash)
-    .maybeSingle();
-
   if (error) {
-    console.error('Appointment tracking lookup failed:', error);
+    console.error('Appointment tracking RPC failed:', error);
     return NextResponse.json({ error: 'Randevu bilgisi şu anda alınamıyor.' }, { status: 500 });
   }
+
+  const appointment = Array.isArray(data) ? data[0] : data;
   if (!appointment) {
     return NextResponse.json({ error: 'Bu kodla eşleşen bir randevu bulunamadı.' }, { status: 404 });
   }
-
-  const { data: business } = await admin
-    .from('businesses')
-    .select('name, address, phone')
-    .eq('id', appointment.business_id)
-    .maybeSingle();
 
   return NextResponse.json({
     appointment: {
@@ -56,54 +52,65 @@ export async function GET(request: NextRequest) {
       startsAt: appointment.starts_at,
       durationMinutes: appointment.duration_minutes,
       status: appointment.status,
-      businessName: business?.name || 'NOIR BARBER',
-      businessAddress: business?.address || null,
-      businessPhone: business?.phone || null,
+      businessName: appointment.business_name || 'NOIR BARBER',
+      businessAddress: appointment.business_address || null,
+      businessPhone: appointment.business_phone || null,
     },
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) return NextResponse.json({ error: 'Takip sistemi şu anda kullanılamıyor.' }, { status: 503 });
+  const supabase = getSupabase();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Takip sistemi şu anda kullanılamıyor.' }, { status: 503 });
+  }
 
   let body: { code?: string; action?: string };
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: 'İstek okunamadı.' }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'İstek okunamadı.' }, { status: 400 });
+  }
+
   if (body.action !== 'cancel' || typeof body.code !== 'string') {
     return NextResponse.json({ error: 'İstek geçersiz.' }, { status: 400 });
   }
 
-  const rawCode = body.code.trim().toUpperCase().replace(/^NOIR-/, '').replace(/-/g, '').toLowerCase();
-  if (!/^[0-9a-f]{24}$/.test(rawCode)) {
+  const tokenHash = getTokenHash(body.code);
+  if (!tokenHash) {
     return NextResponse.json({ error: 'Takip kodunu kontrol et.' }, { status: 400 });
   }
 
-  const tokenHash = createHash('sha256').update(rawCode).digest('hex');
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: appointment, error } = await admin.from('appointments')
-    .select('id,status,starts_at')
-    .eq('notification_token_hash', tokenHash)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('cancel_public_appointment_by_token', {
+    p_token_hash: tokenHash,
+  });
 
-  if (error) return NextResponse.json({ error: 'Randevu bilgisi alınamadı.' }, { status: 500 });
-  if (!appointment) return NextResponse.json({ error: 'Bu kodla eşleşen randevu bulunamadı.' }, { status: 404 });
-  if (!['pending', 'confirmed'].includes(appointment.status) || new Date(appointment.starts_at) <= new Date()) {
+  if (error) {
+    console.error('Appointment cancellation RPC failed:', error);
+    return NextResponse.json({ error: 'Randevu iptal edilemedi.' }, { status: 500 });
+  }
+
+  const cancelled = Array.isArray(data) ? data[0] : data;
+  if (!cancelled) {
+    const { data: existing, error: lookupError } = await supabase.rpc('get_public_appointment_by_token', {
+      p_token_hash: tokenHash,
+    });
+    if (lookupError) {
+      console.error('Appointment cancellation verification failed:', lookupError);
+      return NextResponse.json({ error: 'Randevu durumu doğrulanamadı.' }, { status: 500 });
+    }
+    const appointment = Array.isArray(existing) ? existing[0] : existing;
+    if (!appointment) {
+      return NextResponse.json({ error: 'Bu kodla eşleşen randevu bulunamadı.' }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Bu randevu artık iptal edilemiyor.' }, { status: 409 });
   }
 
-  const { data: updatedAppointment, error: updateError } = await admin.from('appointments')
-    .update({ status: 'cancelled' })
-    .eq('id', appointment.id)
-    .eq('status', appointment.status)
-    .select('id')
-    .maybeSingle();
-  if (updateError) return NextResponse.json({ error: 'Randevu iptal edilemedi.' }, { status: 500 });
-  if (!updatedAppointment) return NextResponse.json({ error: 'Randevu durumu değişti. Sayfayı yenileyip tekrar kontrol et.' }, { status: 409 });
-
-  try { await notifyBusinessOwnersForAppointmentCancellation(appointment.id); }
-  catch (notificationError) { console.error('Could not notify business owner about cancellation:', notificationError); }
+  try {
+    await notifyBusinessOwnersForAppointmentCancellation(cancelled.id);
+  } catch (notificationError) {
+    console.error('Could not notify business owner about cancellation:', notificationError);
+  }
 
   return NextResponse.json({ ok: true, status: 'cancelled' });
 }
