@@ -107,11 +107,16 @@ export default function AdminPage({ businessSlug = 'noir-barber' }: { businessSl
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ role: 'owner', businessSlug, subscription }),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Bildirim aboneliği kaydedilemedi.');
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `Bildirim aboneliği kaydedilemedi (HTTP ${response.status}).`);
       setNotice('Yeni randevu bildirimleri bu cihazda etkin.');
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Bildirimler açılamadı.');
+      const message = error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : (() => { try { return JSON.stringify(error) || 'Bilinmeyen hata'; } catch { return 'Bilinmeyen hata'; } })();
+      setNotice('Bildirimler açılamadı: ' + message);
     }
   }
 
