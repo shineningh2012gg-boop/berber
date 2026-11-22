@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { role, subscription, appointmentId, notificationToken } = body || {};
+    const { role, subscription, appointmentId, notificationToken, businessSlug } = body || {};
 
     if (
       !subscription?.endpoint ||
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     let userId: string | null = null;
 
     if (role === 'owner') {
-      const token = request.headers.get('authorization')?.replace(/^Bearer\\s+/i, '');
+      const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
       if (!token) return NextResponse.json({ error: 'Giriş gerekli.' }, { status: 401 });
 
       const authClient = createClient(url, anonKey, {
@@ -46,21 +46,33 @@ export async function POST(request: NextRequest) {
       }
 
       userId = authData.user.id;
+      if (typeof businessSlug !== 'string' || !/^[a-z0-9-]{2,60}$/.test(businessSlug)) {
+        return NextResponse.json({ error: 'İşletme bağlantısı geçersiz.' }, { status: 400 });
+      }
+      const { data: business, error: businessError } = await admin
+        .from('businesses')
+        .select('id')
+        .eq('slug', businessSlug)
+        .maybeSingle();
+      if (businessError || !business) {
+        return NextResponse.json({ error: 'İşletme bulunamadı.' }, { status: 404 });
+      }
       const { data: membership, error: membershipError } = await admin
         .from('business_members')
         .select('business_id')
         .eq('user_id', userId)
-        .limit(1)
+        .eq('business_id', business.id)
+        .eq('role', 'owner')
         .maybeSingle();
 
       if (membershipError || !membership) {
-        return NextResponse.json({ error: 'İşletme yetkisi bulunamadı.' }, { status: 403 });
+        return NextResponse.json({ error: 'Bu işletme için sahip yetkisi bulunamadı.' }, { status: 403 });
       }
-      businessId = membership.business_id;
+      businessId = business.id;
     } else {
       if (
         typeof appointmentId !== 'string' || !/^[0-9a-f-]{36}$/i.test(appointmentId) ||
-        typeof notificationToken !== 'string' || !/^[0-9a-f]{64}$/.test(notificationToken)
+        typeof notificationToken !== 'string' || !/^[0-9a-f]{24}$/.test(notificationToken)
       ) {
         return NextResponse.json({ error: 'Randevu doğrulama bilgisi geçersiz.' }, { status: 400 });
       }
@@ -79,7 +91,10 @@ export async function POST(request: NextRequest) {
       businessId = appointment.business_id;
     }
 
+    const scopeId = role === 'customer' ? appointmentId : businessId;
+    const subscriptionKey = `${role}:${scopeId}:${createHash('sha256').update(subscription.endpoint).digest('hex')}`;
     const { error } = await admin.from('push_subscriptions').upsert({
+      subscription_key: subscriptionKey,
       business_id: businessId,
       appointment_id: role === 'customer' ? appointmentId : null,
       user_id: userId,
@@ -88,7 +103,7 @@ export async function POST(request: NextRequest) {
       p256dh: subscription.keys.p256dh,
       auth: subscription.keys.auth,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'endpoint' });
+    }, { onConflict: 'subscription_key' });
 
     if (error) throw error;
     return NextResponse.json({ ok: true });

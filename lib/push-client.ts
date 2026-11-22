@@ -8,24 +8,46 @@ function urlBase64ToUint8Array(value: string): Uint8Array {
 }
 
 export async function requestBrowserPushSubscription(): Promise<PushSubscriptionJSON> {
+  if (!window.isSecureContext) {
+    throw new Error('Bildirimler için site HTTPS üzerinden açılmalı.');
+  }
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     throw new Error('Bu tarayıcı web bildirimlerini desteklemiyor.');
   }
 
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!publicKey) throw new Error('Bildirim anahtarı bulunamadı.');
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
+  if (!publicKey) throw new Error('Bildirim anahtarı bulunamadı. NEXT_PUBLIC_VAPID_PUBLIC_KEY ayarını kontrol et.');
 
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') throw new Error('Bildirim izni verilmedi.');
+  let applicationServerKey: Uint8Array;
+  try {
+    applicationServerKey = urlBase64ToUint8Array(publicKey);
+  } catch {
+    throw new Error('Bildirim anahtarı geçersiz biçimde.');
+  }
+  if (applicationServerKey.length !== 65) {
+    throw new Error('Bildirim anahtarı uzunluğu geçersiz. VAPID public key 65 bayt olmalı.');
+  }
 
-  const registration = await navigator.serviceWorker.register('/sw.js');
+  let permission = Notification.permission;
+  if (permission === 'default') permission = await Notification.requestPermission();
+  if (permission !== 'granted') throw new Error('Tarayıcı bildirim izni vermedi. Site ayarlarından Bildirimler için İzin ver seç.');
+
+  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
   await navigator.serviceWorker.ready;
 
   const existing = await registration.pushManager.getSubscription();
-  const subscription = existing || await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
-  });
+  if (existing) return existing.toJSON() as PushSubscriptionJSON;
 
-  return subscription.toJSON() as PushSubscriptionJSON;
+  try {
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: applicationServerKey as BufferSource,
+    });
+    return subscription.toJSON() as PushSubscriptionJSON;
+  } catch (error) {
+    if (error instanceof DOMException) {
+      throw new Error(`Bildirim aboneliği oluşturulamadı (${error.name}): ${error.message}`);
+    }
+    throw error;
+  }
 }
